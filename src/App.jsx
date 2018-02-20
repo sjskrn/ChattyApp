@@ -5,6 +5,8 @@ class App extends Component {
     return (
       <h1>Hello React :)</h1>
     );
+    console.log("Rendering <App/>");
   }
+  
 }
 export default App;
