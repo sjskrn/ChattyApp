@@ -1,76 +1,104 @@
-import React, {Component} from 'react';
+import React, { Component } from "react";
 import Message from "./Message.jsx";
 import ChatBar from "./ChatBar.jsx";
+import NavBar from "./NavBar.jsx";
 
 class App extends Component {
   constructor(props) {
     super(props);
 
+    this.websocket = new WebSocket("ws://localhost:3001");
+
     this.state = {
+      loggedInUsers: "",
       currentUser: "Unknown",
       messages: []
     };
   }
 
-  componentWillMount() {
-    this.setState({
-      messages: [
-        {
-          key: 0,
-          username: "Bob",
-          content: "Has anyone seen my marbles?"
-        },
-        {
-          key: 1,
-          username: "Anonymous",
-          content:
-            "No, I think you lost them. You lost your marbles Bob. You lost them for good."
-        }
-      ]
-    });
-  }
-
   componentDidMount() {
-    console.log("componentDidMount <App />");
-    setTimeout(() => {
-      console.log("Simulating incoming message");
-      // Add a new message to the list of messages in the data store
-      const newMessage = {
-        id: 3,
-        username: "Michelle",
-        content: "Hello there!"
-      };
-      const messages = this.state.messages.concat(newMessage);
-      // Update the state of the app component.
-      // Calling setState will trigger a call to render() in App and all child components.
-      this.setState({ messages: messages });
-    }, 3000);
+    this.websocket.onmessage = event => {
+      let returnedMessage = JSON.parse(event.data);
+      let messages = this.state.messages;
+
+      switch (returnedMessage.type) {
+        case "sumOfUsers":
+          this.setState({ loggedInUsers: returnedMessage.content });
+          break;
+
+        case "message":
+          messages.push(returnedMessage);
+          this.setState({ messages: messages });
+          break;
+
+        case "nameChange":
+          this.setState({ currentUser: returnedMessage.newUsername });
+          break;
+
+        case "notification":
+          messages.push(returnedMessage);
+          this.setState({ messages: messages });
+          break;
+
+        default:
+          throw new Error("Unknown event type: " + data.type);
+      }
+    };
   }
 
-  bringMessage = (content, username) => {
+  handleMessage = content => {
     const newMessage = {
       type: "message",
-      username: username,
+      username: this.state.currentUser,
       content: content
     };
+
+    this.websocket.send(JSON.stringify(newMessage));
+  };
+
+  handleName = nameChange => {
+    const sendData = data => {
+      return this.websocket.send(JSON.stringify(data));
+    };
+
     let messages = this.state.messages;
-    messages.push(newMessage);
-    this.setState({ messages: messages });
+
+    if (this.state.currentUser === nameChange) {
+      const sameName = {
+        type: "alert",
+        username: this.state.currentUser,
+        content: `${this.state.currentUser} is already your name!`
+      };
+
+      sendData(sameName);
+    } else {
+      const newName = {
+        type: "notification",
+        newUsername: nameChange,
+        content: `${
+          this.state.currentUser
+        } has changed their name to ${nameChange}`
+      };
+
+      sendData(newName);
+    }
   };
 
   render() {
-    console.log("Rendering <App/>");
-
-    const currentUser = this.state.currentUser;
     const messages = this.state.messages;
+    const loggedInUsers = this.state.loggedInUsers;
 
     return (
       <div>
+        <NavBar loggedInUsers={loggedInUsers} />
         <Message messages={messages} />
-        <ChatBar bringMessage={this.bringMessage}
-        currentUser={currentUser} />
+        <ChatBar
+          handleMessage={this.handleMessage}
+          handleName={this.handleName}
+        />
       </div>
     );
   }
 }
+
 export default App;
